@@ -1,0 +1,40 @@
+{
+  "name": "@wssz/async-collector",
+  "version": "1.0.0",
+  "description": "",
+  "type": "module",
+  "exports": {
+    ".": {
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "main": "./dist/index.cjs",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "dev": "vitest",
+    "test": "vitest run",
+    "build": "unbuild"
+  },
+  "dependencies": {
+    "ohash": "^1.1.4",
+    "defu": "^6.1.4"
+  },
+  "devDependencies": {
+    "vite": "^6.0.0-beta.2",
+    "tsx": "^4.19.1",
+    "vitest": "^2.1.2",
+    "typescript": "^5.6.2",
+    "unbuild": "^3.0.0-rc.11"
+  },
+  "keywords": ["Async", "Paraller", "typescript"],
+  "author": "Wszerad Martynowski",
+  "repository": {
+    "type": "npm",
+    "url": "https://www.npmjs.com/package/@wssz/di"
+  },
+  "license": "MIT"
+}
