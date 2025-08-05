@@ -1,5 +1,9 @@
-export type Processor<T, R> = (inputs: T[]) => Promise<R[]>
+export type Resolver<I, O> = (job: I, signal: AbortSignal) => Promise<O>
 
-export type Spawn<I, O> = (input: I) => Promise<O>
+export class TimeoutError extends Error {
+	message = 'Timeout error'
+}
 
-
+export class AbortError extends Error {
+	message = 'Abort error'
+}

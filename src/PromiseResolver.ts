@@ -1,150 +1,82 @@
-import { AbortError, Resolver, TimeoutError } from './index.ts'
 import { wait } from './utils.ts'
-import { setContext } from './context.ts'
-import { Spawn } from './types.ts'
+import { AbortError, Resolver, TimeoutError } from './types.ts'
 
-export interface PromiseResolverOptions<I = any, O = any> {
-  fn: Resolver<I, O>
-  abort: () => void
+export interface PromiseResolverOptions {
   retry?: number
   timeout?: number
   delay?: number
 }
 
-export interface PromiseResolverProps<I = any, O = any> {
-  input: I
-  spawn: Spawn<I, O>
-  signal: AbortSignal
-}
-
-enum PromiseResolverState {
-  WAITING,
-  RUNNING,
-  COMPLETED,
-}
-
-export class PromiseResolver<I = any, O = any> {
-  readonly promise: Promise<O>
-  #options: PromiseResolverOptions<I, O>
-  #props: PromiseResolverProps<I, O>
-  #_resolve!: (result: O) => void
-  #_reject!: (error: Error) => void
-  #state: PromiseResolverState = PromiseResolverState.WAITING
-  #delayed: number = 0
-  #attempts: number = 1
-  #children: PromiseResolver[] = []
+export class PromiseResolver<I = any, O = any> extends AbortController {
+  readonly input: I
+  readonly fn: Resolver<I, O>
+  readonly #options: PromiseResolverOptions
+  #running = false
+  #readAt: number = 0
+  #attempts: number = 0
+  #promiseWithResolvers: PromiseWithResolvers<O>
 
   constructor(
-    props: PromiseResolverProps,
+    input: I,
+    fn: Resolver<I, O>,
     options: PromiseResolverOptions,
   ) {
-    this.#props = props
-    this.#attempts = options?.retry || 1
+    super()
+
+    this.input = input
+    this.fn = fn
+    this.#promiseWithResolvers = Promise.withResolvers()
     this.#options = options
-    this.promise = new Promise((resolve, reject) => {
-      this.#_resolve = resolve
-      this.#_reject = reject
-    })
-
-    this.promise.finally(() => {
-      this.#setState(PromiseResolverState.COMPLETED)
-    })
   }
 
-  #setState(state: PromiseResolverState) {
-    this.#state = state
-  }
-
-  isRunning() {
-    return this.#state === PromiseResolverState.RUNNING
-  }
-
-  isCompleted() {
-    return this.#state === PromiseResolverState.COMPLETED
-  }
-
-  get children(): PromiseResolver[] {
-    return this.#children
-  }
-
-  get delayed() {
-    return this.#delayed
-  }
-
-  get runnable(): number {
-    if (this.isRunning()) {
+  get availability() {
+    if (this.#running) {
       return Infinity
     }
 
-    if(this.delayed) {
-      return this.#state === PromiseResolverState.WAITING ? this.delayed : Infinity
-    }
-    return this.#state === PromiseResolverState.WAITING ? 0 : Infinity
+    return this.#readAt
   }
 
-  #setContext() {
-    const { abort } = this.#options
-    const { spawn, signal } = this.#props
-    setContext({
-      signal,
-      abort,
-      spawn
-    })
+  get promise() {
+    return this.#promiseWithResolvers.promise
   }
 
-  #baseFn(): Promise<O> {
-    if(!this.#options.timeout) {
-      this.#setContext()
-      return this.#options.fn(this.#props.input)
+  #callFn(): Promise<O> {
+    if (!this.#options.timeout) {
+      return this.fn(this.input, this.signal)
     }
 
-    const controller = new AbortController()
-    this.#props.signal.addEventListener('abort', controller.abort)
-
-    this.#setContext()
     return Promise
       .race([
         wait(this.#options.timeout).then(() => {
-          controller.abort()
-          console.log('timeout')
+          this.abort()
           throw new TimeoutError()
         }),
-        this.#options.fn(this.#props.input)
+        this.fn(this.input, this.signal)
       ])
-      .finally(() => {
-        console.log('race end')
-        this.#props.signal.removeEventListener('abort', controller.abort)
-      })
   }
 
-  #resolve() {
-    return this.#baseFn()
+  async execute() {
+    this.#attempts++
+    this.#running = true
+    return this.#callFn()
       .then(res => {
-        this.#setState(PromiseResolverState.COMPLETED)
-        this.#_resolve(res)
+        this.#promiseWithResolvers.resolve(res)
+        return true
       })
       .catch(async err => {
-        console.log('catch', err)
-
-        if(this.#attempts <= 0 || err instanceof AbortError) {
-          this.#options.abort()
+        if (!this.#options.retry || this.#attempts > this.#options.retry || err instanceof AbortError) {
+          this.abort()
           throw err
         }
         this.#attempts--
 
         if (this.#options.delay) {
-          this.#delayed = Date.now() + this.#options.delay
+          this.#readAt = Date.now() + this.#options.delay
         }
+        this.#running = false
+        return false
       })
-      .catch(this.#_reject)
-  }
-
-  async run() {
-    this.#setState(PromiseResolverState.RUNNING)
-    await this.#resolve()
-    if (this.#state === PromiseResolverState.COMPLETED) {
-      return
-    }
-    this.#setState(PromiseResolverState.WAITING)
+      .catch(this.#promiseWithResolvers.reject)
   }
 }

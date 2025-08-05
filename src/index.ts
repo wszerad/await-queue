@@ -1,102 +1,55 @@
-import { hash } from 'ohash'
 import { PromiseResolver, PromiseResolverOptions } from './PromiseResolver.ts'
-import { QueuePoll } from './QueuePoll.ts'
+import { QueuePoll, QueuePollOptions } from './QueuePoll.ts'
+import { ResolverCache } from './ResolverCache'
 
 export type Resolver<I, O> = (job: I) => Promise<O>
 
-export class TimeoutError extends Error {
-  message = 'Timeout error'
-}
-export class AbortError extends Error {
-  message = 'Abort error'
-}
-
-interface AsyncCollectorOptions extends Omit<PromiseResolverOptions, 'fn' | 'abort'> {
-  concurrency?: number
+type AsyncCollectorOptions<I, O> = QueuePollOptions & PromiseResolverOptions & {
   signal?: AbortSignal
+  cache?: ResolverCache<I, O>
 }
 
-export class AsyncResolver<I, O> {
-  #matrix = new Map<string, PromiseResolver<any>>
+export class AsyncResolver<I, O, M> {
   #pool: QueuePoll
-  #resolverOptions: PromiseResolverOptions
-  #abortController: AbortController
+  #resolver: Resolver<I, O>
+  #options: AsyncCollectorOptions<I, O>
 
+  constructor(resolver: Resolver<I, O>, options?: AsyncCollectorOptions<I, O>)
+  constructor(resolver: Resolver<I, M>, after?: Resolver<M, O>, options?: AsyncCollectorOptions<I, O>)
   constructor(
     resolver: Resolver<I, O>,
-    options: AsyncCollectorOptions = {}
+    afterOrOptions,
+    options: AsyncCollectorOptions<I, O> = {}
   ) {
-    const abortController = this.#abortController = new AbortController()
-
     this.#pool = new QueuePoll({
-      concurrency: options.concurrency || Infinity,
-      signal: abortController.signal,
+      interval: options.interval || 0,
+      concurrency: options.concurrency || Infinity
     })
 
-    this.#resolverOptions = {
-      ...options,
-      abort: () => abortController.abort(),
-      fn: resolver,
+    if (options.signal) {
+      options.signal.addEventListener('abort', this.#pool.abort)
     }
 
-    // TODO need clearing?
-    options.signal?.addEventListener('abort', () => {
-      abortController.abort()
-    })
+    this.#resolver = resolver
+    this.#options = options
   }
 
-  get size() {
-    return this.#pool.size
-  }
+  async job(input: I): Promise<O> {
+    let promise
 
-  get active() {
-    return this.#pool.active
-  }
-
-  // get concurrency() {
-  //   return this.#resolverOptions.concurrency || Infinity
-  // }
-
-  #getResolver(input: I, signal: AbortSignal): PromiseResolver {
-    const inputHash = hash(input)
-    let promiseResolver = this.#matrix.get(inputHash)
-
-    if (!promiseResolver) {
-      promiseResolver = new PromiseResolver(
-        {
-          input,
-          signal,
-          spawn: (input: I) => this.#spawn(input)
-        },
-        this.#resolverOptions,
+    if (!this.#options.cache || !(promise = this.#options.cache.get(input))) {
+      const resolver = new PromiseResolver(
+        input,
+        this.#resolver,
+        this.#options
       )
-      this.#matrix.set(inputHash, promiseResolver)
+
+      this.#options.cache?.set(input, resolver.promise)
+      this.#pool.push(resolver)
+
+      return resolver.promise
     }
 
-    return promiseResolver
-  }
-
-  // #attachConsumer(): Consumer {
-  //   const ready = this.#consumers.filter(entry => !entry.isPaused())
-  //   let consumer
-  //
-  //   if (ready.length < this.concurrency) {
-  //     consumer = new Consumer()
-  //     this.#consumers.push(consumer)
-  //   }
-  //
-  //   return consumer
-  // }
-
-  #spawn(job: I) {
-    const resolver = this.#getResolver(job, this.#abortController.signal)
-    this.#pool.unshift(resolver)
-    return resolver.promise
-  }
-
-  async job(job: I): Promise<O> {
-    const resolver = this.#getResolver(job, this.#abortController.signal)
-    this.#pool.push(resolver)
-    return resolver.promise
+    return promise
   }
 }

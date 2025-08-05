@@ -1,86 +1,104 @@
 import { PromiseResolver } from './PromiseResolver.ts'
 
 export interface QueuePollOptions {
-  concurrency: number
-  signal?: AbortSignal
+  concurrency?: number
+  interval?: number
 }
 
-export class QueuePoll {
-  #queue: PromiseResolver[] = []
+export class QueuePoll extends AbortController {
+  #queue = new Set<PromiseResolver>()
   #options: QueuePollOptions
+  #slots: number
+  #nextRunTime = 0
   #delay: number = 0
 
   constructor(options: QueuePollOptions) {
+    super()
+
+    this.#slots = options.concurrency || Infinity
     this.#options = options
   }
 
-  get size() {
-    return this.#queue.length
-  }
-
-  get active() {
-    return this.#queue.filter(entry => entry.isRunning()).length
-  }
-
   push(entry: PromiseResolver) {
-    this.#queue.push(entry)
-    this.#run()
-  }
+    entry.signal.addEventListener('abort', this.abort)
 
-  unshift(entry: PromiseResolver) {
-    this.#queue.unshift(entry)
-    this.#run()
-  }
-
-  #run() {
-     const next = this.#take()
-
-    if (next instanceof PromiseResolver) {
-      console.log('next')
-      next.run().finally(() => {
-        if (next.isCompleted()) {
-          this.#remove(next)
-        }
-        this.#run()
-      })
+    if (this.#isReady()) {
+      this.#consume(entry)
       return
     }
 
-    if (next && next !== Infinity) {
+    this.#queue.add(entry)
+  }
+
+  #isReady() {
+    return !(!this.#slots || this.#nextRunTime > Date.now() || this.signal.aborted)
+  }
+
+  async #consume(entry: PromiseResolver) {
+    this.#slots--
+
+    if (this.#options.interval) {
+      this.#nextRunTime = Date.now() + (this.#options.interval || 0)
+    }
+
+    if (!await entry.execute()) {
+      this.#queue.add(entry)
+    }
+
+    this.#slots++
+
+    this.#run()
+  }
+
+  #prepareDelayedRun(otherTime: number = 0) {
+    const nextRunTimeout = Math.max(
+      Math.max(otherTime, this.#nextRunTime) - Date.now(),
+      0
+    )
+
+    if (!nextRunTimeout) {
+      return
+    }
+
+    if (this.#delay) {
       clearTimeout(this.#delay)
-      this.#delay = setTimeout(() => this.#run(), next) as unknown as number
+    }
+    this.#delay = setTimeout(() => this.#run(), nextRunTimeout)
+  }
+
+  async #run() {
+    if (!this.#isReady()) {
+      this.#prepareDelayedRun()
+      return
+    }
+
+    const [time, next] = this.#take()
+    console.log('next', next?.input)
+
+    if (next) {
+      this.#consume(next)
+    } else if (time !== Infinity) {
+      this.#prepareDelayedRun(time)
     }
   }
 
-  #take(): PromiseResolver | number {
+  #take(): [number, PromiseResolver?] {
     const now = Date.now()
     let nextRun = Infinity
-    let next: PromiseResolver | undefined
 
-    const ff = (entry: PromiseResolver): boolean => {
-      const runnable = entry.runnable
-      console.log('grab', runnable, entry)
+    // check if can take always first
+    for (const entry of this.#queue) {
+      const availability = entry.availability
 
-      if (runnable <= now) {
-        next = entry
-        return true
+      if (availability <= now) {
+        this.#queue.delete(entry)
+        return [availability, entry]
       }
 
-      if (runnable < nextRun) {
-        nextRun = runnable
-      }
-
-      return false
+      nextRun = Math.min(nextRun, availability)
     }
 
-    this.#queue.some(entry => ff(entry))
-
-    return next || nextRun
-  }
-
-  #remove(entry: PromiseResolver) {
-    const index = this.#queue.indexOf(entry)
-    this.#queue.splice(index, 1)
+    return [nextRun]
   }
 }
 
