@@ -167,18 +167,27 @@ describe('case circular', () => {
 	// TODO signal support
 
 	it('should resolve recursive', async () => {
-		const j: (input: number) => Promise<number> = job()
+		const job = async (input: number) => {
+			return Promise.resolve(input)
+		}
 
 		async function res(input: number) {
 			if (input <= 0) return null
 
 			return {
-				value: await j(input),
-				valuePlus: await spawn(input - 1)
+				value: await job(input),
+				valuePlus: input - 1
 			}
 		}
 
-		const jobResolver = new AsyncResolver(res)
+		const jobResolver = new AsyncResolver(res, async (out, fn) => {
+			if (!out) return out
+
+			return {
+				...out,
+				valuePlus: await fn(out.valuePlus)
+			}
+		})
 		const results = await jobResolver.job(3)
 
 		expect(results).toEqual({

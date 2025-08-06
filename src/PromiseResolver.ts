@@ -1,5 +1,5 @@
 import { wait } from './utils.ts'
-import { AbortError, Resolver, TimeoutError } from './types.ts'
+import { AbortError, Mapper, Resolver, TimeoutError } from './types.ts'
 
 export interface PromiseResolverOptions {
   retry?: number
@@ -7,24 +7,27 @@ export interface PromiseResolverOptions {
   delay?: number
 }
 
-export class PromiseResolver<I = any, O = any> extends AbortController {
-  readonly input: I
-  readonly fn: Resolver<I, O>
+export class PromiseResolver extends AbortController {
+  readonly input: any
+  readonly fn: Resolver
+  readonly map: Mapper
   readonly #options: PromiseResolverOptions
   #running = false
   #readAt: number = 0
   #attempts: number = 0
-  #promiseWithResolvers: PromiseWithResolvers<O>
+  #promiseWithResolvers: PromiseWithResolvers<any>
 
   constructor(
-    input: I,
-    fn: Resolver<I, O>,
+    input: any,
+    fn: Resolver,
     options: PromiseResolverOptions,
+    map: Mapper,
   ) {
     super()
 
     this.input = input
     this.fn = fn
+    this.map = map
     this.#promiseWithResolvers = Promise.withResolvers()
     this.#options = options
   }
@@ -41,9 +44,9 @@ export class PromiseResolver<I = any, O = any> extends AbortController {
     return this.#promiseWithResolvers.promise
   }
 
-  #callFn(): Promise<O> {
+  #callFn(): Promise<any> {
     if (!this.#options.timeout) {
-      return this.fn(this.input, this.signal)
+      return this.fn(this.input, this.signal).then(this.map)
     }
 
     return Promise
@@ -54,6 +57,7 @@ export class PromiseResolver<I = any, O = any> extends AbortController {
         }),
         this.fn(this.input, this.signal)
       ])
+      .then(this.map)
   }
 
   async execute() {

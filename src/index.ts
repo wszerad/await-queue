@@ -1,8 +1,7 @@
 import { PromiseResolver, PromiseResolverOptions } from './PromiseResolver.ts'
 import { QueuePoll, QueuePollOptions } from './QueuePoll.ts'
 import { ResolverCache } from './ResolverCache'
-
-export type Resolver<I, O> = (job: I) => Promise<O>
+import { Mapper, RecursiveResolver, Resolver } from './types'
 
 type AsyncCollectorOptions<I, O> = QueuePollOptions & PromiseResolverOptions & {
   signal?: AbortSignal
@@ -11,16 +10,21 @@ type AsyncCollectorOptions<I, O> = QueuePollOptions & PromiseResolverOptions & {
 
 export class AsyncResolver<I, O, M> {
   #pool: QueuePoll
-  #resolver: Resolver<I, O>
+  #resolver: Resolver<I, O> | Resolver<I, M>
+  #map: Mapper<M, O>
   #options: AsyncCollectorOptions<I, O>
 
-  constructor(resolver: Resolver<I, O>, options?: AsyncCollectorOptions<I, O>)
-  constructor(resolver: Resolver<I, M>, after?: Resolver<M, O>, options?: AsyncCollectorOptions<I, O>)
+  constructor(resolver: Resolver<I, O>)
+  constructor(resolver: Resolver<I, O>, options: AsyncCollectorOptions<I, O>)
+  constructor(resolver: Resolver<I, M>, map?: RecursiveResolver<I, M, O>, options?: AsyncCollectorOptions<I, O>)
   constructor(
-    resolver: Resolver<I, O>,
-    afterOrOptions,
-    options: AsyncCollectorOptions<I, O> = {}
+    resolver: Resolver<I, O> | Resolver<I, M>,
+    mapOrOptions?: AsyncCollectorOptions<I, O> | RecursiveResolver<I, M, O>,
+    options?: AsyncCollectorOptions<I, O>
   ) {
+    options = (typeof mapOrOptions === 'function' ? options : mapOrOptions) || {}
+    mapOrOptions = typeof mapOrOptions === 'function' ? mapOrOptions : undefined
+
     this.#pool = new QueuePoll({
       interval: options.interval || 0,
       concurrency: options.concurrency || Infinity
@@ -31,6 +35,9 @@ export class AsyncResolver<I, O, M> {
     }
 
     this.#resolver = resolver
+    this.#map = mapOrOptions
+      ? (out) => mapOrOptions(out, input => this.job(input), this.#pool.signal)
+      : (out) => out as any as O
     this.#options = options
   }
 
@@ -41,7 +48,8 @@ export class AsyncResolver<I, O, M> {
       const resolver = new PromiseResolver(
         input,
         this.#resolver,
-        this.#options
+        this.#options,
+        this.#map
       )
 
       this.#options.cache?.set(input, resolver.promise)
@@ -51,5 +59,9 @@ export class AsyncResolver<I, O, M> {
     }
 
     return promise
+  }
+
+  jobs(inputs: I[]): Promise<O>[] {
+    return inputs.map(input => this.job(input))
   }
 }
