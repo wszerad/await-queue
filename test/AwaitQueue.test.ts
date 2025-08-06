@@ -14,9 +14,7 @@ function testJobs<T>() {
 			const job = Promise.withResolvers<void>()
 			running.push(job)
 
-			console.log('call', input)
 			await wait(1)
-			console.log('finish', input)
 			finished++
 
 			return input
@@ -25,9 +23,7 @@ function testJobs<T>() {
 			const job = Promise.withResolvers<void>()
 			running.push(job)
 
-			console.log('call', input)
 			await job.promise
-			console.log('finish', input)
 			finished++
 
 			return input
@@ -47,7 +43,7 @@ function testJobs<T>() {
 	}
 }
 
-describe('case circular', () => {
+describe('AwaitQueue', () => {
 
 	it('should resolve all jobs at once', async () => {
 		const { call, count, resolve } = testJobs()

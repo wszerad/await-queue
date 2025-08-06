@@ -20,7 +20,7 @@ export class QueuePoll extends AbortController {
   }
 
   push(entry: PromiseResolver) {
-    entry.signal.addEventListener('abort', this.abort)
+    entry.signal.addEventListener('abort', (e) => this.abort(e))
 
     if (this.#isReady()) {
       this.#consume(entry)
@@ -73,7 +73,6 @@ export class QueuePoll extends AbortController {
     }
 
     const [time, next] = this.#take()
-    console.log('next', next?.input)
 
     if (next) {
       this.#consume(next)
