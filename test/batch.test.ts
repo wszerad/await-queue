@@ -1,8 +1,8 @@
-import { AsyncResolver } from '../src'
+import { AwaitQueue } from '../src'
 import { TimeoutError } from '../src/types'
 
 import { wait } from '../src/utils.ts'
-import { Cache } from '../src/ResolverCache.ts'
+import { HashCache } from '../src/ResolverCache.ts'
 import { expect } from 'vitest'
 
 function testJobs<T>() {
@@ -51,7 +51,7 @@ describe('case circular', () => {
 
 	it('should resolve all jobs at once', async () => {
 		const { call, count, resolve } = testJobs()
-		const jobResolver = new AsyncResolver(call)
+		const jobResolver = new AwaitQueue(call)
 		const inputs = [1, 2, 3, 4, 5]
 		const jobs = Promise.all(inputs.map(input => jobResolver.job(input)))
 
@@ -62,7 +62,7 @@ describe('case circular', () => {
 
 	it('should resolve job in sequence', async () => {
 		const { call, count, countFinished, resolve } = testJobs()
-		const jobResolver = new AsyncResolver(call, { concurrency: 1 })
+		const jobResolver = new AwaitQueue(call, { concurrency: 1 })
 
 		const jobOne = jobResolver.job(1)
 		const jobTwo = jobResolver.job(2)
@@ -82,7 +82,7 @@ describe('case circular', () => {
 
 	it('should resolve jobs in sequence', async () => {
 		const { call, count, countFinished, resolve } = testJobs()
-		const jobResolver = new AsyncResolver(call, { concurrency: 2 })
+		const jobResolver = new AwaitQueue(call, { concurrency: 2 })
 		const inputs = [1, 2, 3, 4]
 		const [jobOne, jobTwo, jobTree, jobFour] = inputs.map(input => jobResolver.job(input))
 
@@ -101,7 +101,7 @@ describe('case circular', () => {
 
 	it('should resolve jobs in interval', async () => {
 		const { instantCall, count } = testJobs()
-		const jobResolver = new AsyncResolver(instantCall, { interval: 100 })
+		const jobResolver = new AwaitQueue(instantCall, { interval: 100 })
 		const inputs = [1, 2]
 		const [jobOne, jobTwo] = inputs.map(input => jobResolver.job(input))
 		const startTime = Date.now()
@@ -115,7 +115,7 @@ describe('case circular', () => {
 
 	it('should fail job', async () => {
 		const { call, reject } = testJobs()
-		const jobResolver = new AsyncResolver(call)
+		const jobResolver = new AwaitQueue(call)
 
 		const job = jobResolver.job(1)
 		reject('attempt failed')
@@ -127,7 +127,7 @@ describe('case circular', () => {
 
 	it('should resolve after retry', async () => {
 		const { call, reject, resolve } = testJobs()
-		const jobResolver = new AsyncResolver(call, { retry: 2 })
+		const jobResolver = new AwaitQueue(call, { retry: 2 })
 
 		const job = jobResolver.job(1)
 		reject('attempt failed')
@@ -140,7 +140,7 @@ describe('case circular', () => {
 
 	it('should resolve with cache', async () => {
 		const { call, resolve, count } = testJobs()
-		const jobResolver = new AsyncResolver(call, { cache: new Cache() })
+		const jobResolver = new AwaitQueue(call, { cache: new HashCache() })
 
 		const input = {
 			id: 1
@@ -155,7 +155,7 @@ describe('case circular', () => {
 
 	it('should fail after timeout', async () => {
 		const { call } = testJobs()
-		const jobResolver = new AsyncResolver(call, { timeout: 100 })
+		const jobResolver = new AwaitQueue(call, { timeout: 100 })
 		const startTime = Date.now()
 
 		await expect(jobResolver.job(1))
@@ -180,7 +180,7 @@ describe('case circular', () => {
 			}
 		}
 
-		const jobResolver = new AsyncResolver(res, async (out, fn) => {
+		const jobResolver = new AwaitQueue(res, async (out, fn) => {
 			if (!out) return out
 
 			return {

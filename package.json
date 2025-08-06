@@ -1,5 +1,5 @@
 {
-  "name": "@wssz/async-collector",
+  "name": "AwaitQueue",
   "version": "1.0.0",
   "description": "",
   "type": "module",
@@ -19,11 +19,8 @@
     "test": "vitest run",
     "build": "unbuild"
   },
-  "dependencies": {
-    "ohash": "^2.0.11",
-    "defu": "^6.1.4"
-  },
   "devDependencies": {
+    "ohash": "^2.0.11",
     "vite": "^7.0.6",
     "tsx": "^4.19.1",
     "vitest": "^4.0.0-beta.5",

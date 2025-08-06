@@ -3,24 +3,24 @@ import { QueuePoll, QueuePollOptions } from './QueuePoll.ts'
 import { ResolverCache } from './ResolverCache'
 import { Mapper, RecursiveResolver, Resolver } from './types'
 
-type AsyncCollectorOptions<I, O> = QueuePollOptions & PromiseResolverOptions & {
+type AwaitQueueOptions<I, O> = QueuePollOptions & PromiseResolverOptions & {
   signal?: AbortSignal
   cache?: ResolverCache<I, O>
 }
 
-export class AsyncResolver<I, O, M> {
+export class AwaitQueue<I, O, M> {
   #pool: QueuePoll
   #resolver: Resolver<I, O> | Resolver<I, M>
   #map: Mapper<M, O>
-  #options: AsyncCollectorOptions<I, O>
+  #options: AwaitQueueOptions<I, O>
 
   constructor(resolver: Resolver<I, O>)
-  constructor(resolver: Resolver<I, O>, options: AsyncCollectorOptions<I, O>)
-  constructor(resolver: Resolver<I, M>, map?: RecursiveResolver<I, M, O>, options?: AsyncCollectorOptions<I, O>)
+  constructor(resolver: Resolver<I, O>, options: AwaitQueueOptions<I, O>)
+  constructor(resolver: Resolver<I, M>, map?: RecursiveResolver<I, M, O>, options?: AwaitQueueOptions<I, O>)
   constructor(
     resolver: Resolver<I, O> | Resolver<I, M>,
-    mapOrOptions?: AsyncCollectorOptions<I, O> | RecursiveResolver<I, M, O>,
-    options?: AsyncCollectorOptions<I, O>
+    mapOrOptions?: AwaitQueueOptions<I, O> | RecursiveResolver<I, M, O>,
+    options?: AwaitQueueOptions<I, O>
   ) {
     options = (typeof mapOrOptions === 'function' ? options : mapOrOptions) || {}
     mapOrOptions = typeof mapOrOptions === 'function' ? mapOrOptions : undefined

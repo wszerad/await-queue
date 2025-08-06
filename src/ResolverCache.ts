@@ -5,7 +5,7 @@ export interface ResolverCache<I, O> {
 	get(input: I): Promise<O> | undefined
 }
 
-export class Cache<I, O> {
+export class HashCache<I, O> {
 	#cache = new Map<string, Promise<O>>()
 
 	get(input: I): Promise<O> | undefined {

@@ -1,9 +1,9 @@
-# AsyncResolver
+# AwaitQueue
 
 A TypeScript helper for managing asynchronous jobs with support for concurrency, retry, delay, timeout, and caching.
 
 ```ts
-const resolver = new AsyncResolver(async (name, signal) => {
+const resolver = new AwaitQueue(async (name, signal) => {
   const req = await fetch(`https://pokeapi.co/api/v2/pokemon/${name}`, {
     method: 'GET',
     signal,
@@ -19,7 +19,7 @@ const pokemonDetailsList = await Promise.all(
 )
 ```
 
-## class AsyncResolver<I,O>(resolver, options)
+## class AwaitQueue<I,O>(resolver, options)
 
 ### resolver: (job: I, signal: AbortSignal) => Promise<O>
 A function that takes input of type I and returns a Promise of type O.
@@ -35,10 +35,12 @@ A function that takes input of type I and returns a Promise of type O.
 
 ## methods
 
-### ```job(input: I): Promise<O>```
-### ```jobs(input: I[]): Promise<O>[]```
+### job
+```job(input: I): Promise<O>```
+### jobs
+```jobs(inputs: I[]): Promise<O>[]```
 
 # Recursive support
-## class AsyncResolver<I,O,M>(resolver, map, options?)
+## class AwaitQueue<I,O,M>(resolver, map, options?)
 ### map: (output: M, resolver: (job: I) => Promise<O>, signal: AbortSignal) => Promise<O>
 Postprocessing function, receive a result of resolver and allow to call a recursive job with independent timeout or retry counter.
