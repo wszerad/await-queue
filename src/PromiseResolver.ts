@@ -1,4 +1,4 @@
-import { wait } from './utils.ts'
+import { promiseWithResolvers, wait } from './utils.ts'
 import { AbortError, Mapper, Resolver, TimeoutError } from './types.ts'
 
 export interface PromiseResolverOptions {
@@ -28,7 +28,7 @@ export class PromiseResolver extends AbortController {
     this.input = input
     this.fn = fn
     this.map = map
-    this.#promiseWithResolvers = Promise.withResolvers()
+    this.#promiseWithResolvers = promiseWithResolvers()
     this.#options = options
   }
 

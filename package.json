@@ -1,15 +1,13 @@
 {
   "name": "@wszerad/await-queue",
-  "version": "1.0.0",
+  "version": "1.0.2",
   "description": "",
   "type": "module",
   "exports": {
-    ".": {
-      "import": "./dist/index.mjs",
-      "require": "./dist/index.cjs"
-    }
+    ".": "./dist/index.js",
+    "./package.json": "./package.json"
   },
-  "main": "./dist/index.cjs",
+  "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "files": [
     "dist"
@@ -17,21 +15,33 @@
   "scripts": {
     "dev": "vitest",
     "test": "vitest run",
-    "build": "unbuild"
+    "build": "tsdown --target node18"
   },
   "devDependencies": {
     "ohash": "^2.0.11",
     "vite": "^7.0.6",
-    "tsx": "^4.19.1",
     "vitest": "^4.0.0-beta.5",
     "typescript": "^5.9.2",
-    "unbuild": "^3.6.0"
+    "tsdown": "^0.13.3"
   },
-  "keywords": ["Async", "Paraller", "typescript"],
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "keywords": [
+    "async",
+    "await",
+    "queue",
+    "paraller",
+    "typescript",
+    "retry",
+    "delay",
+    "q"
+  ],
   "author": "Wszerad Martynowski",
   "repository": {
     "type": "npm",
-    "url": "https://www.npmjs.com/package/@wssz/di"
+    "url": "https://www.npmjs.com/package/@wszerad/await-queue"
   },
-  "license": "MIT"
+  "license": "MIT",
+  "module": "./dist/index.js"
 }
