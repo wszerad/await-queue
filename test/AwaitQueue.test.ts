@@ -151,8 +151,8 @@ describe('AwaitQueue', () => {
 
 	it('should fail after timeout', async () => {
 		const { call } = testJobs()
-		const jobResolver = new AwaitQueue(call, { timeout: 100 })
 		const startTime = Date.now()
+		const jobResolver = new AwaitQueue(call, { timeout: 100 })
 
 		await expect(jobResolver.job(1))
 			.rejects
