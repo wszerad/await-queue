@@ -1,6 +1,6 @@
 {
   "name": "@wszerad/await-queue",
-  "version": "1.0.5",
+  "version": "1.0.6",
   "description": "",
   "type": "module",
   "exports": {
@@ -13,14 +13,22 @@
     "dist"
   ],
   "scripts": {
-    "dev": "vitest",
+    "build": "npm run typecheck && npm run bundle",
+    "typecheck": "tsgo -p tsconfig.json",
+    "bundle": "tsdown --target node18",
     "test": "vitest run",
-    "build": "tsdown --target node18"
+    "test:watch": "vitest",
+    "lint": "oxlint src",
+    "lint:format": "oxlint src && oxfmt --check src",
+    "format": "oxfmt src"
   },
   "devDependencies": {
     "ohash": "^2.0.11",
+    "@typescript/native-preview": "^7.0.0-dev.20251231.1",
     "vite": "^7.0.6",
     "vitest": "^4.0.0-beta.5",
+    "oxfmt": "^0.21.0",
+    "oxlint": "^1.36.0",
     "typescript": "^5.9.2",
     "tsdown": "^0.18.4"
   },
